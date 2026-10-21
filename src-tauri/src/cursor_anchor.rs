@@ -83,7 +83,7 @@ unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
     if title.is_empty() {
         return BOOL(1);
     }
-    if title.contains("Clawd Usage") || title == "Clawd" {
+    if title.contains("IA Usage") || title.contains("Clawd Usage") || title == "Clawd" {
         return BOOL(1);
     }
 

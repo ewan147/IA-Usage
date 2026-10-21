@@ -141,7 +141,7 @@ export default function App() {
         <div className="hero-copy">
           <p className="brand">
             <ClawdSprite id="sparkles" size={28} className="brand-sprite" />
-            Clawd Usage
+            IA Usage
           </p>
           <h1>Ta conso, jour après jour.</h1>
           <p className="lede">

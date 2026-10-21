@@ -1,7 +1,7 @@
 [package]
 name = "clawd-usage"
 version = "0.1.0"
-description = "Clawd Usage — Claude Code + Cursor token dashboard"
+description = "IA Usage — Claude Code + Cursor token dashboard"
 authors = ["you"]
 edition = "2021"
 

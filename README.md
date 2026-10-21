@@ -1,24 +1,43 @@
 # IA Usage
 
-Petite app Windows (Tauri) pour suivre ta conso tokens **Claude Code** et **Cursor**, avec un widget flottant Clawd.
+Dashboard Windows pour ta conso tokens **Claude Code** + **Cursor**, avec un petit Clawd collé en bas à droite des fenêtres.
 
-## Fonctionnalités
+```
+Cursor / Claude  →  [Clawd]  →  clic  →  dashboard
+```
 
-- **Claude Code** — lecture locale des logs JSONL (`~/.claude/projects`)
-- **Cursor** — sync auto 1×/jour depuis cursor.com (session Cursor locale), fallback CSV Téléchargements
-- **Widget** — se colle en bas à droite des fenêtres Cursor / Claude ; clic = ouvrir le dashboard
+## Install rapide (Windows)
 
-## Lancer
+Une commande depuis le repo cloné :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+```
+
+Ça build si besoin, installe dans `%LOCALAPPDATA%\IA-Usage`, active le **démarrage Windows**, crée un raccourci bureau, et lance l’app. Au prochain login, le logo est déjà là.
+
+## Ce que ça fait
+
+| Source | Données |
+| --- | --- |
+| **Claude Code** | Logs locaux `~/.claude/projects/**/*.jsonl` |
+| **Cursor** | Sync auto 1×/jour via ta session Cursor (`cursor.com`) |
+
+Le widget suit Cursor et Claude. Clic = ouvrir le dashboard (qui reste en fond si tu le fermes).
+
+## Dev
 
 ```bash
 npm install
 npm run tauri dev
 ```
 
-## Build
+Build seul :
 
 ```bash
 npm run tauri build
 ```
 
-L’exécutable sort dans `src-tauri/target/release/`.
+## Releases
+
+Les builds Windows partent aussi via GitHub Actions (tag `v*` ou manuel). Voir l’onglet [Releases](https://github.com/ewan147/IA-Usage/releases).

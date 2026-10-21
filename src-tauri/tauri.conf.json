@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Clawd Usage",
+  "productName": "IA Usage",
   "version": "0.1.0",
-  "identifier": "com.ewang.clawd-usage",
+  "identifier": "com.ewang.ia-usage",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -32,7 +32,7 @@
       },
       {
         "label": "main",
-        "title": "Clawd Usage",
+        "title": "IA Usage",
         "url": "index.html",
         "width": 1120,
         "height": 780,

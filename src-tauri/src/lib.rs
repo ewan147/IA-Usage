@@ -1,3 +1,4 @@
+mod autostart;
 mod cursor_anchor;
 mod cursor_sync;
 mod usage;
@@ -109,6 +110,9 @@ pub fn run() {
             show_dashboard
         ])
         .setup(|app| {
+            // Launch with Windows so the widget is always available.
+            autostart::ensure_autostart();
+
             // Widget follows Cursor / Claude windows (bottom-right of that window).
             if let Some(widget) = app.get_webview_window("widget") {
                 // WebView2 defaults to opaque white — force transparent bg.

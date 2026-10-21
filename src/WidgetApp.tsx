@@ -23,7 +23,7 @@ export function WidgetApp() {
     <button
       type="button"
       className="widget-hit"
-      title="Clawd Usage"
+      title="IA Usage"
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         e.preventDefault();
