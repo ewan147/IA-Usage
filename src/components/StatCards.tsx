@@ -25,7 +25,7 @@ export function StatCards({
   const allCards = [
     {
       key: "claude" as const,
-      label: "Claude Code",
+      label: "Claude",
       tokens: claudeTokens,
       cost: claudeCost,
       tone: "claude" as const,
@@ -39,7 +39,7 @@ export function StatCards({
     },
     {
       key: "global" as const,
-      label: "Global",
+      label: "Total",
       tokens: totalTokens,
       cost: totalCost,
       tone: "global" as const,

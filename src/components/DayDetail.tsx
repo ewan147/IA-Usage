@@ -50,7 +50,7 @@ export function DayDetail({ day, source, onClose }: Props) {
 
       <div className="detail-grid">
         <article className="detail-card">
-          <h3>Split</h3>
+          <h3>Répartition</h3>
           <p className="split-lines">
             {source !== "cursor" && (
               <span className="pill claude">
@@ -61,26 +61,26 @@ export function DayDetail({ day, source, onClose }: Props) {
             {source !== "claude" && (
               <span className="pill cursor">
                 Cursor {formatTokens(day.cursorTokens)}
-                <small>{formatTokensFull(day.cursorTokens)} (Total Tokens CSV)</small>
+                <small>{formatTokensFull(day.cursorTokens)}</small>
               </span>
             )}
           </p>
         </article>
 
         <article className="detail-card">
-          <h3>Modèle préféré</h3>
+          <h3>Modèle du jour</h3>
           <p className="big">
             {models[0] ? prettyModel(models[0].model) : "—"}
           </p>
-          <p className="muted small">Heure moyenne : {formatHour(day.avgHour)}</p>
+          <p className="muted small">Pic vers {formatHour(day.avgHour)}</p>
         </article>
       </div>
 
       <div className="detail-grid">
         <article className="detail-card wide">
-          <h3>Modèles ce jour</h3>
+          <h3>Modèles</h3>
           {models.length === 0 ? (
-            <p className="muted">Aucun modèle pour ce filtre.</p>
+            <p className="muted">Rien pour ce filtre.</p>
           ) : (
             <ul className="model-list">
               {models.map((m) => (
@@ -99,7 +99,7 @@ export function DayDetail({ day, source, onClose }: Props) {
         </article>
 
         <article className="detail-card wide">
-          <h3>Heures d’activité (jour)</h3>
+          <h3>Par heure</h3>
           <div className="hour-bars">
             {hours.map((count, hour) => (
               <div key={hour} className="hour-col" title={`${hour}h : ${count}`}>

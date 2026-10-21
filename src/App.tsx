@@ -33,7 +33,6 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [skateKey, setSkateKey] = useState(0);
-  const [justRefreshed, setJustRefreshed] = useState(false);
   const [blastTick, setBlastTick] = useState(0);
 
   const refresh = useCallback(async (days: PeriodFilter) => {
@@ -46,8 +45,6 @@ export default function App() {
         if (prev && next.days.some((d) => d.date === prev)) return prev;
         return next.days[next.days.length - 1]?.date ?? null;
       });
-      setJustRefreshed(true);
-      window.setTimeout(() => setJustRefreshed(false), 1400);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -130,7 +127,7 @@ export default function App() {
   }, [periodHours]);
 
   const selected = data?.days.find((d) => d.date === selectedDate) ?? null;
-  const periodLabel = `${period}j`;
+  const periodLabel = `${period} jours`;
 
   return (
     <div className="app">
@@ -143,12 +140,12 @@ export default function App() {
             <ClawdSprite id="sparkles" size={28} className="brand-sprite" />
             IA Usage
           </p>
-          <h1>Ta conso, jour après jour.</h1>
+          <h1>Tes tokens, jour après jour</h1>
           <p className="lede">
-            Modèle préféré ({periodLabel}) :{" "}
+            Sur {periodLabel} — modèle le plus utilisé :{" "}
             <strong>{periodFavorite ? prettyModel(periodFavorite) : "—"}</strong>
-            {" · "}
-            heure moyenne : <strong>{formatHour(periodAvgHour)}</strong>
+            <span className="lede-sep">·</span>
+            pic d’activité vers <strong>{formatHour(periodAvgHour)}</strong>
           </p>
         </div>
         <ClawdMascot
@@ -178,15 +175,15 @@ export default function App() {
               className={period === p ? "active" : ""}
               onClick={() => setPeriod(p)}
             >
-              {p} jours
+              {p} j
             </button>
           ))}
         </div>
 
-        <div className="seg with-sprite">
+        <div className="seg">
           {(
             [
-              ["all", "Global", "flag"],
+              ["all", "Global", null],
               ["claude", "Claude", "halo"],
               ["cursor", "Cursor", "sunglasses"],
             ] as const
@@ -197,7 +194,7 @@ export default function App() {
               className={source === id ? "active" : ""}
               onClick={() => setSource(id)}
             >
-              {source === id && (
+              {source === id && sprite && (
                 <ClawdSprite id={sprite} size={22} className="inline-sprite" />
               )}
               {label}
@@ -211,28 +208,8 @@ export default function App() {
           disabled={loading}
           onClick={() => void refresh(period)}
         >
-          <motion.span
-            animate={
-              loading
-                ? { rotate: 360 }
-                : justRefreshed
-                  ? { scale: [1, 1.25, 1], y: [0, -4, 0] }
-                  : { rotate: 0 }
-            }
-            transition={
-              loading
-                ? { duration: 0.8, repeat: Infinity, ease: "linear" }
-                : { duration: 0.45 }
-            }
-            className="refresh-sprite"
-          >
-            <ClawdSprite
-              id={justRefreshed ? "flag" : "invader"}
-              size={28}
-              title="Rafraîchir"
-            />
-          </motion.span>
-          {loading ? "Scan…" : "Rafraîchir"}
+          <ClawdSprite id="invader" size={26} title="Rafraîchir" />
+          {loading ? "Chargement…" : "Rafraîchir"}
         </button>
       </div>
 
@@ -265,7 +242,7 @@ export default function App() {
             </motion.span>
             Par jour
           </h2>
-          <p>Clique une barre · Cursor = Total Tokens du CSV</p>
+          <p>Clique une barre pour le détail</p>
         </div>
         {data ? (
           <DayChart
@@ -291,7 +268,7 @@ export default function App() {
       )}
 
       {!selected && data?.days[data.days.length - 1] && (
-        <section className="today">
+        <section className="today panel today-panel">
           <h2>
             <ClawdSprite id="halo" size={28} className="inline-sprite" />
             Aujourd’hui
@@ -301,7 +278,10 @@ export default function App() {
           </p>
           <p className="today-full">
             {formatTokensFull(tokensForSource(data.days[data.days.length - 1], source))}{" "}
-            tokens · {data.days[data.days.length - 1].requestCount} requêtes ·{" "}
+            tokens
+            <span className="lede-sep">·</span>
+            {data.days[data.days.length - 1].requestCount} requêtes
+            <span className="lede-sep">·</span>
             {costForSource(data.days[data.days.length - 1], source).toFixed(2)} $
           </p>
         </section>
@@ -316,9 +296,11 @@ export default function App() {
         >
           <ClawdSprite id="skate" size={28} />
         </button>
-        {data?.cursorAutoPath
-          ? `Cursor · ${data.cursorAutoPath}`
-          : "Cursor · sync auto 1×/jour via ta session Cursor (sinon CSV Téléchargements)"}
+        <span>
+          {data?.cursorAutoPath
+            ? `Cursor · ${data.cursorAutoPath}`
+            : "Cursor · sync auto une fois par jour (session Cursor)"}
+        </span>
       </footer>
     </div>
   );

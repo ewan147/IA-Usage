@@ -141,10 +141,25 @@ fn process_base_name(pid: u32) -> Option<String> {
     }
 }
 
-/// Foreground Cursor/Claude window if any, else the largest visible one.
+/// Only when Cursor or Claude is the focused app — never float over other windows.
 pub fn find_host_anchor() -> Option<AnchorRect> {
     unsafe {
         let foreground = GetForegroundWindow();
+        if foreground.0.is_null() {
+            return None;
+        }
+
+        let mut fg_pid = 0u32;
+        GetWindowThreadProcessId(foreground, Some(&mut fg_pid));
+        if fg_pid == 0 {
+            return None;
+        }
+        let fg_name = process_base_name(fg_pid)?;
+        // Hide as soon as another app (browser, fullscreen game, …) has focus.
+        if !is_target_process(&fg_name) {
+            return None;
+        }
+
         let mut state = EnumState {
             targets: Vec::new(),
             foreground,
@@ -158,6 +173,11 @@ pub fn find_host_anchor() -> Option<AnchorRect> {
             return None;
         }
 
+        // Prefer the focused top-level window; else largest Cursor/Claude window.
+        if let Some((_, rect, _)) = state.targets.iter().find(|(hwnd, _, _)| *hwnd == foreground)
+        {
+            return Some(*rect);
+        }
         if let Some((_, rect, _)) = state.targets.iter().find(|(_, _, fg)| *fg) {
             return Some(*rect);
         }

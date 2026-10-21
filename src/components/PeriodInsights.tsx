@@ -31,15 +31,15 @@ export function PeriodInsights({
   return (
     <section className="panel insights">
       <div className="panel-head">
-        <h2>Période ({periodLabel})</h2>
+        <h2>Sur {periodLabel}</h2>
         <p>
-          Heure moyenne : <strong>{formatHour(avgHour)}</strong>
+          Activité moyenne vers <strong>{formatHour(avgHour)}</strong>
         </p>
       </div>
 
       <div className="detail-grid">
         <article className="detail-card wide">
-          <h3>Heures d’usage — {periodLabel}</h3>
+          <h3>Répartition par heure</h3>
           <div className="hour-bars">
             {hourCounts.map((count, hour) => (
               <div key={hour} className="hour-col" title={`${hour}h : ${count}`}>
@@ -61,10 +61,10 @@ export function PeriodInsights({
               ? "Modèles Cursor"
               : source === "claude"
                 ? "Modèles Claude"
-                : "Modèles (Claude + Cursor)"}
+                : "Modèles utilisés"}
           </h3>
           {filtered.length === 0 ? (
-            <p className="muted">Aucun modèle sur cette période / filtre.</p>
+            <p className="muted">Rien à afficher pour ce filtre.</p>
           ) : (
             <ul className="model-list">
               {filtered.map((m) => (
