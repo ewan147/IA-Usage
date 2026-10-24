@@ -1,3 +1,6 @@
+import type { ChartMetric } from "./settings";
+import type { DayBucket, SourceFilter } from "./types";
+
 /** Compact label for big numbers (FR: Md = milliards). */
 export function formatTokens(n: number): string {
   const abs = Math.abs(n);
@@ -112,4 +115,80 @@ export function hoursForSource(
       return _exhaustive;
     }
   }
+}
+
+export function requestsForSource(day: DayBucket, source: SourceFilter): number {
+  switch (source) {
+    case "all":
+      return day.requestCount;
+    case "claude":
+      return day.models
+        .filter((m) => m.source === "claude")
+        .reduce((s, m) => s + m.requests, 0);
+    case "cursor":
+      return day.models
+        .filter((m) => m.source === "cursor")
+        .reduce((s, m) => s + m.requests, 0);
+    default: {
+      const _exhaustive: never = source;
+      return _exhaustive;
+    }
+  }
+}
+
+export function metricForSource(
+  day: DayBucket,
+  source: SourceFilter,
+  metric: ChartMetric,
+): number {
+  switch (metric) {
+    case "tokens":
+      return tokensForSource(day, source);
+    case "cost":
+      return costForSource(day, source);
+    case "requests":
+      return requestsForSource(day, source);
+    default: {
+      const _exhaustive: never = metric;
+      return _exhaustive;
+    }
+  }
+}
+
+export function formatMetricValue(n: number, metric: ChartMetric): string {
+  switch (metric) {
+    case "tokens":
+      return formatTokens(n);
+    case "cost":
+      return formatUsd(n);
+    case "requests":
+      return formatTokensFull(Math.round(n));
+    default: {
+      const _exhaustive: never = metric;
+      return _exhaustive;
+    }
+  }
+}
+
+export function metricUnitLabel(metric: ChartMetric): string {
+  switch (metric) {
+    case "tokens":
+      return "tokens";
+    case "cost":
+      return "USD";
+    case "requests":
+      return "requêtes";
+    default: {
+      const _exhaustive: never = metric;
+      return _exhaustive;
+    }
+  }
+}
+
+export function toCumulative(values: number[]): number[] {
+  let sum = 0;
+  return values.map((v) => {
+    sum += v;
+    return sum;
+  });
 }

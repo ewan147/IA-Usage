@@ -1,0 +1,35 @@
+﻿<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Clawd</title>
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+    background:transparent !important; background-color:rgba(0,0,0,0)!important; }
+  button { all:unset; display:grid; place-items:center; width:100%; height:100%; cursor:pointer; }
+  img { width:56px; height:56px; display:block; image-rendering:pixelated; pointer-events:none;
+    background:transparent !important; -webkit-user-drag:none; }
+  button:hover img { opacity:0.92; transform:scale(1.05); }
+</style>
+</head>
+<body>
+<button type="button" id="hit" title="IA Usage">
+  <img src="data:image/png;base64,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" alt="" />
+</button>
+<script>
+  const hit = document.getElementById('hit');
+  let busy = false;
+  hit.addEventListener('pointerdown', async (e) => {
+    if (e.button !== 0 || busy) return;
+    e.preventDefault();
+    busy = true;
+    try {
+      const invoke = window.__TAURI__?.core?.invoke;
+      if (invoke) await invoke('show_dashboard');
+    } catch (_) {}
+    setTimeout(() => { busy = false; }, 400);
+  });
+</script>
+</body>
+</html>

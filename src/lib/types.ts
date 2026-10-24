@@ -44,4 +44,5 @@ export type CursorImportResult = {
 };
 
 export type SourceFilter = "all" | "claude" | "cursor";
-export type PeriodFilter = 7 | 30;
+/** `0` = all available history (lifetime). */
+export type PeriodFilter = 7 | 30 | 90 | 0;

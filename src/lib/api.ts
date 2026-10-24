@@ -16,3 +16,7 @@ export async function autoImportCursorCsv(): Promise<CursorImportResult | null> 
 export async function showDashboard(): Promise<void> {
   return invoke("show_dashboard");
 }
+
+export async function hideDashboard(): Promise<void> {
+  return invoke("hide_dashboard");
+}

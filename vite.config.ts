@@ -8,6 +8,8 @@ const root = import.meta.dirname;
 
 export default defineConfig(() => ({
   plugins: [react()],
+  // Relative asset URLs for the dashboard (Tauri custom protocol).
+  base: "./",
   clearScreen: false,
   server: {
     port: 1420,
@@ -25,10 +27,10 @@ export default defineConfig(() => ({
     },
   },
   build: {
+    // Dashboard only — widget is a static public/widget.html (no Vite/React).
     rollupOptions: {
       input: {
         main: resolve(root, "index.html"),
-        widget: resolve(root, "widget.html"),
       },
     },
   },

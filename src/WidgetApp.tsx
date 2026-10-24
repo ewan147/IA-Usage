@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { sprites } from "./assets/clawd/sprites";
+import { SPARKLES_DATA_URL } from "./assets/clawd/sparklesDataUrl";
 import { showDashboard } from "./lib/api";
 
 /** Minimal widget UI — no layout chrome, just the transparent mascot. */
@@ -30,7 +30,8 @@ export function WidgetApp() {
         openDashboard();
       }}
     >
-      <img src={sprites.sparkles} alt="" draggable={false} />
+      {/* Data-URL sprite: never depends on asset:// path resolution */}
+      <img src={SPARKLES_DATA_URL} alt="" draggable={false} />
     </button>
   );
 }

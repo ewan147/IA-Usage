@@ -10,6 +10,7 @@ type Props = {
   totalCost: number;
   periodLabel: string;
   source: SourceFilter;
+  showCost: boolean;
 };
 
 export function StatCards({
@@ -21,6 +22,7 @@ export function StatCards({
   totalCost,
   periodLabel,
   source,
+  showCost,
 }: Props) {
   const allCards = [
     {
@@ -61,9 +63,11 @@ export function StatCards({
             {formatTokens(card.tokens)}
           </p>
           <p className="stat-full">{formatTokensFull(card.tokens)} tokens</p>
-          <p className="stat-cost">
-            {formatUsd(card.cost)} · {periodLabel}
-          </p>
+          {showCost && (
+            <p className="stat-cost">
+              {formatUsd(card.cost)} · {periodLabel}
+            </p>
+          )}
         </article>
       ))}
     </div>

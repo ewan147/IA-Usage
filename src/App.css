@@ -106,7 +106,15 @@ body::before {
   gap: 8px;
 }
 
-.settings-btn {
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.settings-btn,
+.close-dash-btn {
   margin-left: 0 !important;
   padding: 6px 12px !important;
   font-size: 0.85rem !important;
@@ -274,10 +282,10 @@ body::before {
 .seg button {
   background: transparent;
   color: var(--muted);
-  padding: 9px 15px;
+  padding: 9px 12px;
   border-radius: 999px;
   transition: background 0.2s ease, color 0.2s ease;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
 }
 
 .seg button.active {
@@ -545,6 +553,122 @@ body::before {
   color: var(--muted);
   transform: rotate(-35deg);
   white-space: nowrap;
+}
+
+.chart-line {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.line-svg {
+  width: 100%;
+  height: 180px;
+  display: block;
+  overflow: visible;
+}
+
+.line-baseline {
+  stroke: rgba(246, 235, 227, 0.12);
+  stroke-width: 1;
+}
+
+.line-path {
+  stroke: var(--terracotta);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.line-area {
+  fill: rgba(210, 125, 95, 0.22);
+}
+
+.line-dot {
+  fill: #fff8f2;
+  stroke: var(--terracotta-deep);
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: r 0.15s ease;
+}
+
+.line-dot:hover,
+.line-dot.selected {
+  fill: var(--cyan-soft);
+  stroke: var(--cyan);
+}
+
+.line-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+  min-height: 1.1rem;
+}
+
+.line-label {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.62rem;
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-label.selected {
+  color: var(--cyan-soft);
+  font-weight: 700;
+}
+
+.chart-heat {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+}
+
+.heat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 58px;
+  padding: 10px 10px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(246, 235, 227, 0.1);
+  background: rgba(210, 125, 95, calc(var(--heat, 0) * 0.72));
+  color: #fff8f2;
+  cursor: pointer;
+  text-align: left;
+  transition: outline 0.15s ease, transform 0.15s ease;
+}
+
+.heat-cell.empty {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+}
+
+.heat-cell:hover,
+.heat-cell.selected {
+  outline: 2px solid var(--cyan-soft);
+  outline-offset: 1px;
+  transform: translateY(-1px);
+}
+
+.heat-day {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.heat-val {
+  font-size: 0.68rem;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
 }
 
 .dropzone {
@@ -888,6 +1012,59 @@ body::before {
 .settings-toggle.on {
   border-color: rgba(210, 125, 95, 0.5);
   background: rgba(210, 125, 95, 0.1);
+}
+
+.settings-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-toggle-text small {
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.settings-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.settings-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.settings-choice:hover {
+  border-color: rgba(246, 235, 227, 0.28);
+}
+
+.settings-choice.active {
+  border-color: rgba(210, 125, 95, 0.65);
+  background: rgba(210, 125, 95, 0.12);
+}
+
+.settings-choice-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.settings-choice-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.35;
 }
 
 @media (max-width: 860px) {

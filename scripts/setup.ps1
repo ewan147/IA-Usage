@@ -10,17 +10,15 @@ $ReleaseExe = Join-Path $Root "src-tauri\target\release\clawd-usage.exe"
 Write-Host "=== IA Usage setup ===" -ForegroundColor Cyan
 Set-Location $Root
 
+# Always use `tauri build` (not bare `cargo build`) so the frontend is embedded.
+# Bare cargo release keeps http://localhost:1420 and the dashboard fails offline.
+Write-Host "Build release (tauri build, peut prendre quelques minutes)..." -ForegroundColor Yellow
+if (-not (Test-Path (Join-Path $Root "node_modules"))) {
+  npm install
+}
+npx tauri build --no-bundle
 if (-not (Test-Path $ReleaseExe)) {
-  Write-Host "Build release (premiere fois, quelques minutes)..." -ForegroundColor Yellow
-  if (-not (Test-Path (Join-Path $Root "node_modules"))) {
-    npm install
-  }
-  npm run tauri build
-  if (-not (Test-Path $ReleaseExe)) {
-    throw "Build OK attendu mais exe introuvable: $ReleaseExe"
-  }
-} else {
-  Write-Host "Exe release deja present." -ForegroundColor DarkGray
+  throw "Build OK attendu mais exe introuvable: $ReleaseExe"
 }
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
@@ -43,8 +41,14 @@ $Sc.Description = "IA Usage - Claude + Cursor tokens"
 $Sc.Save()
 Write-Host "Raccourci bureau: $ShortcutPath"
 
-# Launch now (kill previous instance if any)
+# Launch now (kill ALL previous instances — duplicates make the widget flicker)
 Get-Process -Name "ia-usage","clawd-usage" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 400
+Start-Sleep -Milliseconds 600
 Start-Process -FilePath $InstallExe
-Write-Host "Lance. Le logo Clawd se colle en bas a droite de Cursor / Claude." -ForegroundColor Green
+Start-Sleep -Milliseconds 800
+$alive = @(Get-Process -Name "ia-usage","clawd-usage" -ErrorAction SilentlyContinue)
+if ($alive.Count -ne 1) {
+  Write-Host "Attention: $($alive.Count) process IA Usage (attendu: 1)." -ForegroundColor Yellow
+} else {
+  Write-Host "Lance (1 process). Le logo Clawd se colle en bas a droite de Cursor / Claude." -ForegroundColor Green
+}

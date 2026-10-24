@@ -8,9 +8,12 @@ import { DayDetail } from "./components/DayDetail";
 import { PeriodInsights } from "./components/PeriodInsights";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatCards } from "./components/StatCards";
-import { fetchMergedUsage } from "./lib/api";
+import { fetchMergedUsage, hideDashboard } from "./lib/api";
 import {
   applyFontPreset,
+  CHART_METRIC_OPTIONS,
+  CHART_SCALE_OPTIONS,
+  CHART_STYLE_OPTIONS,
   loadSettings,
   saveSettings,
   type AppSettings,
@@ -27,6 +30,7 @@ import {
   formatTokens,
   formatTokensFull,
   hoursForSource,
+  metricUnitLabel,
   prettyModel,
   tokensForSource,
 } from "./lib/format";
@@ -94,6 +98,19 @@ export default function App() {
   useEffect(() => {
     void refresh(period);
   }, [period, refresh]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (settingsOpen) {
+        setSettingsOpen(false);
+        return;
+      }
+      void hideDashboard();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [settingsOpen]);
 
   const totals = useMemo(() => {
     const days = data?.days ?? [];
@@ -207,7 +224,17 @@ export default function App() {
   }, [data, settings.enableClaude, settings.enableCursor]);
 
   const selected = chartDays.find((d) => d.date === selectedDate) ?? null;
-  const periodLabel = `${period} jours`;
+  const periodLabel =
+    period === 0 ? "toute la période" : `${period} jours`;
+  const metricLabel =
+    CHART_METRIC_OPTIONS.find((o) => o.id === settings.chartMetric)?.label ??
+    "Tokens";
+  const styleLabel =
+    CHART_STYLE_OPTIONS.find((o) => o.id === settings.chartStyle)?.label ??
+    "Barres";
+  const scaleLabel =
+    CHART_SCALE_OPTIONS.find((o) => o.id === settings.chartScale)?.label ??
+    "Par jour";
   const bothSources = settings.enableClaude && settings.enableCursor;
 
   const sourceButtons = (
@@ -234,14 +261,24 @@ export default function App() {
               <ClawdSprite id="sparkles" size={28} className="brand-sprite" />
               IA Usage
             </p>
-            <button
-              type="button"
-              className="ghost settings-btn"
-              onClick={() => setSettingsOpen(true)}
-              title="Réglages"
-            >
-              Réglages
-            </button>
+            <div className="hero-actions">
+              <button
+                type="button"
+                className="ghost settings-btn"
+                onClick={() => setSettingsOpen(true)}
+                title="Réglages"
+              >
+                Réglages
+              </button>
+              <button
+                type="button"
+                className="ghost close-dash-btn"
+                onClick={() => void hideDashboard()}
+                title="Fermer (Échap)"
+              >
+                Fermer
+              </button>
+            </div>
           </div>
           <h1>Tes tokens, jour après jour</h1>
           <p className="lede">
@@ -273,14 +310,14 @@ export default function App() {
           >
             <ClawdSprite id="arrows" size={32} title="Changer de période" />
           </motion.span>
-          {([7, 30] as PeriodFilter[]).map((p) => (
+          {([7, 30, 90, 0] as PeriodFilter[]).map((p) => (
             <button
               key={p}
               type="button"
               className={period === p ? "active" : ""}
               onClick={() => setPeriod(p)}
             >
-              {p} j
+              {p === 0 ? "Total" : `${p} j`}
             </button>
           ))}
         </div>
@@ -316,7 +353,14 @@ export default function App() {
 
       {error && <p className="banner error">{error}</p>}
 
-      <StatCards {...totals} periodLabel={periodLabel} source={activeSource} />
+      {settings.showStatCards && (
+        <StatCards
+          {...totals}
+          periodLabel={periodLabel}
+          source={activeSource}
+          showCost={settings.showCostOnCards}
+        />
+      )}
 
       <PeriodInsights
         hourCounts={periodHours}
@@ -324,41 +368,52 @@ export default function App() {
         models={periodModels}
         source={activeSource}
         periodLabel={periodLabel}
+        showHourChart={settings.showHourChart}
+        showModels={settings.showModels}
       />
 
-      <section className="panel">
-        <div className="panel-head">
-          <h2>
-            <motion.span
-              key={blastTick}
-              animate={
-                blastTick > 0
-                  ? { x: [0, 10, -6, 4, 0], scale: [1, 1.2, 1] }
-                  : {}
-              }
-              transition={{ duration: 0.45 }}
-              className="panel-sprite"
-            >
-              <ClawdSprite id="blast" size={32} title="Détail jour" />
-            </motion.span>
-            Par jour
-          </h2>
-          <p>Clique une barre pour le détail</p>
-        </div>
-        {data ? (
-          <DayChart
-            days={chartDays}
-            source={activeSource}
-            selectedDate={selectedDate}
-            onSelect={(date) => {
-              setSelectedDate(date);
-              setBlastTick((t) => t + 1);
-            }}
-          />
-        ) : (
-          <p className="muted">Chargement…</p>
-        )}
-      </section>
+      {settings.showDayChart && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>
+              <motion.span
+                key={blastTick}
+                animate={
+                  blastTick > 0
+                    ? { x: [0, 10, -6, 4, 0], scale: [1, 1.2, 1] }
+                    : {}
+                }
+                transition={{ duration: 0.45 }}
+                className="panel-sprite"
+              >
+                <ClawdSprite id="blast" size={32} title="Détail jour" />
+              </motion.span>
+              {metricLabel} · {styleLabel}
+            </h2>
+            <p>
+              {scaleLabel} · {metricUnitLabel(settings.chartMetric)} — clique
+              pour le détail
+            </p>
+          </div>
+          {data ? (
+            <DayChart
+              days={chartDays}
+              source={activeSource}
+              selectedDate={selectedDate}
+              onSelect={(date) => {
+                setSelectedDate(date);
+                setBlastTick((t) => t + 1);
+              }}
+              metric={settings.chartMetric}
+              chartStyle={settings.chartStyle}
+              scale={settings.chartScale}
+              splitSources={settings.splitSources}
+            />
+          ) : (
+            <p className="muted">Chargement…</p>
+          )}
+        </section>
+      )}
 
       {selected && (
         <DayDetail
@@ -368,7 +423,7 @@ export default function App() {
         />
       )}
 
-      {!selected && today && (
+      {!selected && settings.showToday && today && (
         <section className="today panel today-panel">
           <h2>
             <ClawdSprite id="halo" size={28} className="inline-sprite" />

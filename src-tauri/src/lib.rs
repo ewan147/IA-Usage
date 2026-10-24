@@ -1,6 +1,8 @@
 mod autostart;
 mod cursor_anchor;
 mod cursor_sync;
+mod native_mascot;
+mod single_instance;
 mod usage;
 
 use tauri::{AppHandle, Manager};
@@ -22,8 +24,7 @@ fn auto_import_cursor_csv(app: AppHandle) -> Result<Option<CursorImportResult>, 
     usage::ensure_cursor_usage(&app, true)
 }
 
-#[tauri::command]
-fn show_dashboard(app: AppHandle) -> Result<(), String> {
+pub(crate) fn show_dashboard_inner(app: &AppHandle) -> Result<(), String> {
     let Some(window) = app.get_webview_window("main") else {
         return Err("Dashboard window not found".into());
     };
@@ -43,6 +44,28 @@ fn show_dashboard(app: AppHandle) -> Result<(), String> {
 
     let _ = window.set_always_on_top(false);
     let _ = window.set_focus();
+    Ok(())
+}
+
+#[tauri::command]
+fn show_dashboard(app: AppHandle) -> Result<(), String> {
+    show_dashboard_inner(&app)
+}
+
+#[tauri::command]
+fn hide_dashboard(app: AppHandle) -> Result<(), String> {
+    hide_dashboard_inner(&app)
+}
+
+pub(crate) fn hide_dashboard_inner(app: &AppHandle) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("main") else {
+        return Err("Dashboard window not found".into());
+    };
+    let _ = window.hide();
+    #[cfg(target_os = "windows")]
+    {
+        force_hide_window(&window);
+    }
     Ok(())
 }
 
@@ -97,8 +120,27 @@ fn force_foreground_window(window: &tauri::WebviewWindow) {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn force_hide_window(window: &tauri::WebviewWindow) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    unsafe {
+        let _ = ShowWindow(HWND(hwnd.0), SW_HIDE);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Two instances = two widgets fighting (flicker / wrong size / z-order war).
+    if !single_instance::try_acquire() {
+        eprintln!("IA Usage is already running — exiting duplicate instance.");
+        return;
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
@@ -107,39 +149,20 @@ pub fn run() {
             get_merged_usage,
             import_cursor_csv,
             auto_import_cursor_csv,
-            show_dashboard
+            show_dashboard,
+            hide_dashboard
         ])
         .setup(|app| {
             // Launch with Windows so the widget is always available.
             autostart::ensure_autostart();
 
             // Widget follows Cursor / Claude windows (bottom-right of that window).
+            // Hide the legacy WebView widget — native layered mascot replaces it.
             if let Some(widget) = app.get_webview_window("widget") {
-                // WebView2 defaults to opaque white — force transparent bg.
-                let _ = widget.with_webview(|platform| {
-                    #[cfg(target_os = "windows")]
-                    {
-                        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller2;
-                        use windows::core::Interface;
-                        unsafe {
-                            let controller = platform.controller();
-                            if let Ok(c2) = controller.cast::<ICoreWebView2Controller2>() {
-                                let _ = c2.SetDefaultBackgroundColor(
-                                    webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_COLOR {
-                                        A: 0,
-                                        R: 0,
-                                        G: 0,
-                                        B: 0,
-                                    },
-                                );
-                            }
-                        }
-                    }
-                    #[cfg(not(target_os = "windows"))]
-                    {
-                        let _ = platform;
-                    }
-                });
+                let _ = widget.hide();
+            }
+            if let Err(e) = native_mascot::create(app.handle().clone()) {
+                eprintln!("native mascot failed: {e}");
             }
             cursor_anchor::start_host_follow(app.handle().clone());
 
@@ -147,8 +170,11 @@ pub fn run() {
                 let main_for_close = main.clone();
                 main.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        // Keep the process alive (mascot stays) — just dismiss the dashboard.
                         api.prevent_close();
                         let _ = main_for_close.hide();
+                        #[cfg(target_os = "windows")]
+                        force_hide_window(&main_for_close);
                     }
                 });
             }

@@ -151,7 +151,11 @@ fn parse_local_datetime(raw: &str) -> Option<DateTime<Local>> {
         .map(|dt| dt.with_timezone(&Local))
 }
 
+/// `days == 0` → all available history (no rolling window).
 fn cutoff_date(days: u32) -> NaiveDate {
+    if days == 0 {
+        return NaiveDate::from_ymd_opt(2015, 1, 1).unwrap_or(NaiveDate::MIN);
+    }
     let today = Local::now().date_naive();
     let span = days.max(1).saturating_sub(1) as i64;
     today - Duration::days(span)
@@ -182,6 +186,10 @@ fn empty_day(date: String) -> DayBucket {
 }
 
 fn empty_series(days: u32) -> BTreeMap<String, DayAcc> {
+    // Lifetime: don't pre-fill thousands of empty days — only emit days with data.
+    if days == 0 {
+        return BTreeMap::new();
+    }
     let today = Local::now().date_naive();
     let start = cutoff_date(days);
     let mut map = BTreeMap::new();
@@ -838,6 +846,15 @@ pub fn load_merged_usage(days: u32, app: &AppHandle) -> Result<MergedUsageRespon
     fold_claude_calls(claude_calls, &mut map);
 
     let cursor = load_cursor(app);
+    // Cursor-only days must appear even when the series wasn't pre-filled (lifetime).
+    for date in cursor.days.keys() {
+        if let Ok(d) = NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+            if d >= cutoff {
+                map.entry(date.clone()).or_default();
+            }
+        }
+    }
+
     let mut days_out = Vec::new();
     for (date, acc) in map {
         let cday = cursor.days.get(&date);
@@ -845,6 +862,10 @@ pub fn load_merged_usage(days: u32, app: &AppHandle) -> Result<MergedUsageRespon
             if d < cutoff && cday.is_none() && acc.requests == 0 {
                 continue;
             }
+        }
+        // Lifetime: skip fully empty calendar holes.
+        if days == 0 && cday.is_none() && acc.requests == 0 {
+            continue;
         }
         days_out.push(finalize_day(date, acc, cday));
     }

@@ -10,13 +10,14 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "widget",
         "title": "Clawd",
-        "url": "widget.html",
-        "width": 56,
-        "height": 56,
+        "url": "clawd-mascot.html",
+        "width": 72,
+        "height": 72,
         "resizable": false,
         "decorations": false,
         "transparent": true,
