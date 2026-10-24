@@ -35,12 +35,26 @@ body {
 .app {
   position: relative;
   min-height: 100vh;
-  padding: 52px 40px 48px;
+  padding: 44px 44px 56px;
+  max-width: 1180px;
+  margin: 0 auto;
   background:
     radial-gradient(ellipse 80% 50% at 10% -10%, rgba(210, 125, 95, 0.28), transparent 55%),
     radial-gradient(ellipse 60% 40% at 90% 0%, rgba(0, 150, 255, 0.18), transparent 50%),
     linear-gradient(165deg, #1f1712 0%, #15110e 45%, #1a1512 100%);
   overflow-x: hidden;
+}
+
+/* Full-bleed backdrop behind the centered column */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(210, 125, 95, 0.22), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(0, 150, 255, 0.14), transparent 50%),
+    linear-gradient(165deg, #1f1712 0%, #15110e 45%, #1a1512 100%);
 }
 
 .grain {
@@ -68,19 +82,34 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 28px;
+  gap: 28px;
+  margin-bottom: 32px;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  max-width: 520px;
 }
 
 .brand {
   font-family: var(--font-display);
   font-size: 1.35rem;
   color: var(--terracotta);
-  margin: 0 0 10px;
+  margin: 0;
   letter-spacing: 0.02em;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.settings-btn {
+  margin-left: 0 !important;
+  padding: 6px 12px !important;
+  font-size: 0.85rem !important;
 }
 
 .clawd-sprite {
@@ -724,19 +753,157 @@ body {
 }
 
 .foot {
-  margin-top: 8px;
+  margin-top: 12px;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.foot-meta {
+  line-height: 1.45;
+  opacity: 0.9;
+}
+
+/* —— Settings —— */
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(8, 5, 4, 0.62);
+  backdrop-filter: blur(6px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.settings-panel {
+  width: min(420px, 100%);
+  height: 100%;
+  padding: 28px 24px 36px;
+  background: linear-gradient(165deg, #2a201a 0%, #1a1410 55%, #15110e 100%);
+  border-left: 1px solid var(--line);
+  box-shadow: -20px 0 50px rgba(0, 0, 0, 0.45);
+  overflow-y: auto;
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.settings-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+
+.settings-close {
+  margin-left: 0 !important;
+}
+
+.settings-block {
+  margin-bottom: 28px;
+}
+
+.settings-block h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.settings-hint {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.settings-fonts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-font {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.settings-font:hover {
+  border-color: rgba(246, 235, 227, 0.28);
+}
+
+.settings-font.active {
+  border-color: rgba(210, 125, 95, 0.65);
+  background: rgba(210, 125, 95, 0.12);
+}
+
+.settings-font-label {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.settings-font-sample {
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
+.settings-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.settings-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--terracotta);
+}
+
+.settings-toggle.on {
+  border-color: rgba(210, 125, 95, 0.5);
+  background: rgba(210, 125, 95, 0.1);
 }
 
 @media (max-width: 860px) {
   .app {
     padding: 24px 18px 36px;
+    max-width: none;
   }
 
   .hero {
     flex-direction: column-reverse;
     align-items: flex-start;
+  }
+
+  .brand-row {
+    width: 100%;
+    max-width: none;
   }
 
   .stats,
@@ -754,5 +921,9 @@ body {
 
   .model-list li {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .settings-panel {
+    width: 100%;
   }
 }

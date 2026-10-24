@@ -6,8 +6,15 @@ import { SkateIntro } from "./components/SkateIntro";
 import { DayChart } from "./components/DayChart";
 import { DayDetail } from "./components/DayDetail";
 import { PeriodInsights } from "./components/PeriodInsights";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { StatCards } from "./components/StatCards";
 import { fetchMergedUsage } from "./lib/api";
+import {
+  applyFontPreset,
+  loadSettings,
+  saveSettings,
+  type AppSettings,
+} from "./lib/settings";
 import type {
   MergedUsageResponse,
   ModelStat,
@@ -25,6 +32,16 @@ import {
 } from "./lib/format";
 import "./App.css";
 
+function resolveSource(
+  source: SourceFilter,
+  enableClaude: boolean,
+  enableCursor: boolean,
+): SourceFilter {
+  if (enableClaude && !enableCursor) return "claude";
+  if (enableCursor && !enableClaude) return "cursor";
+  return source;
+}
+
 export default function App() {
   const [period, setPeriod] = useState<PeriodFilter>(7);
   const [source, setSource] = useState<SourceFilter>("all");
@@ -34,6 +51,28 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [skateKey, setSkateKey] = useState(0);
   const [blastTick, setBlastTick] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
+
+  const activeSource = resolveSource(
+    source,
+    settings.enableClaude,
+    settings.enableCursor,
+  );
+
+  useEffect(() => {
+    applyFontPreset(settings.font);
+    saveSettings(settings);
+    // Keep filter coherent with enabled sources.
+    if (settings.enableClaude && !settings.enableCursor) setSource("claude");
+    else if (settings.enableCursor && !settings.enableClaude) setSource("cursor");
+    else if (source !== "all" && source === "claude" && !settings.enableClaude) {
+      setSource("all");
+    } else if (source !== "all" && source === "cursor" && !settings.enableCursor) {
+      setSource("all");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to settings toggles/font
+  }, [settings]);
 
   const refresh = useCallback(async (days: PeriodFilter) => {
     setLoading(true);
@@ -59,14 +98,20 @@ export default function App() {
   const totals = useMemo(() => {
     const days = data?.days ?? [];
     return days.reduce(
-      (acc, d) => ({
-        claudeTokens: acc.claudeTokens + d.claudeTokens,
-        cursorTokens: acc.cursorTokens + d.cursorTokens,
-        totalTokens: acc.totalTokens + d.totalTokens,
-        claudeCost: acc.claudeCost + d.claudeCostUsd,
-        cursorCost: acc.cursorCost + d.cursorCostUsd,
-        totalCost: acc.totalCost + d.estimatedCostUsd,
-      }),
+      (acc, d) => {
+        const claudeTokens = settings.enableClaude ? d.claudeTokens : 0;
+        const cursorTokens = settings.enableCursor ? d.cursorTokens : 0;
+        const claudeCost = settings.enableClaude ? d.claudeCostUsd : 0;
+        const cursorCost = settings.enableCursor ? d.cursorCostUsd : 0;
+        return {
+          claudeTokens: acc.claudeTokens + claudeTokens,
+          cursorTokens: acc.cursorTokens + cursorTokens,
+          totalTokens: acc.totalTokens + claudeTokens + cursorTokens,
+          claudeCost: acc.claudeCost + claudeCost,
+          cursorCost: acc.cursorCost + cursorCost,
+          totalCost: acc.totalCost + claudeCost + cursorCost,
+        };
+      },
       {
         claudeTokens: 0,
         cursorTokens: 0,
@@ -76,12 +121,14 @@ export default function App() {
         totalCost: 0,
       },
     );
-  }, [data]);
+  }, [data, settings.enableClaude, settings.enableCursor]);
 
   const periodModels = useMemo(() => {
     const map = new Map<string, ModelStat>();
     for (const d of data?.days ?? []) {
       for (const m of d.models) {
+        if (m.source === "claude" && !settings.enableClaude) continue;
+        if (m.source === "cursor" && !settings.enableCursor) continue;
         const key = `${m.source}::${m.model}`;
         const prev = map.get(key);
         if (prev) {
@@ -94,27 +141,42 @@ export default function App() {
       }
     }
     return [...map.values()].sort((a, b) => b.tokens - a.tokens);
-  }, [data]);
+  }, [data, settings.enableClaude, settings.enableCursor]);
 
   const periodFavorite = useMemo(() => {
     const filtered = periodModels.filter((m) => {
-      if (source === "claude") return m.source === "claude";
-      if (source === "cursor") return m.source === "cursor";
+      if (activeSource === "claude") return m.source === "claude";
+      if (activeSource === "cursor") return m.source === "cursor";
       return true;
     });
     return filtered[0]?.model ?? null;
-  }, [periodModels, source]);
+  }, [periodModels, activeSource]);
 
   const periodHours = useMemo(() => {
     const hours = Array(24).fill(0) as number[];
     for (const d of data?.days ?? []) {
-      const srcHours = hoursForSource(d, source);
-      srcHours.forEach((c, h) => {
-        hours[h] += c;
-      });
+      const srcHours = hoursForSource(d, activeSource);
+      // If "all" but one source disabled, rebuild from enabled only.
+      if (activeSource === "all") {
+        const claude = settings.enableClaude
+          ? d.claudeHourCounts?.length === 24
+            ? d.claudeHourCounts
+            : Array(24).fill(0)
+          : Array(24).fill(0);
+        const cursor = settings.enableCursor
+          ? d.cursorHourCounts?.length === 24
+            ? d.cursorHourCounts
+            : Array(24).fill(0)
+          : Array(24).fill(0);
+        for (let h = 0; h < 24; h++) hours[h] += claude[h] + cursor[h];
+      } else {
+        srcHours.forEach((c, h) => {
+          hours[h] += c;
+        });
+      }
     }
     return hours;
-  }, [data, source]);
+  }, [data, activeSource, settings.enableClaude, settings.enableCursor]);
 
   const periodAvgHour = useMemo(() => {
     let sum = 0;
@@ -126,8 +188,39 @@ export default function App() {
     return weight > 0 ? sum / weight : null;
   }, [periodHours]);
 
-  const selected = data?.days.find((d) => d.date === selectedDate) ?? null;
+  const chartDays = useMemo(() => {
+    if (!data) return [];
+    if (settings.enableClaude && settings.enableCursor) return data.days;
+    return data.days.map((d) => ({
+      ...d,
+      claudeTokens: settings.enableClaude ? d.claudeTokens : 0,
+      cursorTokens: settings.enableCursor ? d.cursorTokens : 0,
+      totalTokens:
+        (settings.enableClaude ? d.claudeTokens : 0) +
+        (settings.enableCursor ? d.cursorTokens : 0),
+      models: d.models.filter((m) => {
+        if (m.source === "claude") return settings.enableClaude;
+        if (m.source === "cursor") return settings.enableCursor;
+        return true;
+      }),
+    }));
+  }, [data, settings.enableClaude, settings.enableCursor]);
+
+  const selected = chartDays.find((d) => d.date === selectedDate) ?? null;
   const periodLabel = `${period} jours`;
+  const bothSources = settings.enableClaude && settings.enableCursor;
+
+  const sourceButtons = (
+    [
+      ...(bothSources ? ([["all", "Global", null]] as const) : []),
+      ...(settings.enableClaude ? ([["claude", "Claude", "halo"]] as const) : []),
+      ...(settings.enableCursor
+        ? ([["cursor", "Cursor", "sunglasses"]] as const)
+        : []),
+    ] as const
+  );
+
+  const today = chartDays[chartDays.length - 1];
 
   return (
     <div className="app">
@@ -136,21 +229,33 @@ export default function App() {
 
       <header className="hero">
         <div className="hero-copy">
-          <p className="brand">
-            <ClawdSprite id="sparkles" size={28} className="brand-sprite" />
-            IA Usage
-          </p>
+          <div className="brand-row">
+            <p className="brand">
+              <ClawdSprite id="sparkles" size={28} className="brand-sprite" />
+              IA Usage
+            </p>
+            <button
+              type="button"
+              className="ghost settings-btn"
+              onClick={() => setSettingsOpen(true)}
+              title="Réglages"
+            >
+              Réglages
+            </button>
+          </div>
           <h1>Tes tokens, jour après jour</h1>
           <p className="lede">
-            Sur {periodLabel} — modèle le plus utilisé :{" "}
+            Sur {periodLabel}
+            <span className="lede-sep">·</span>
+            modèle le plus utilisé :{" "}
             <strong>{periodFavorite ? prettyModel(periodFavorite) : "—"}</strong>
             <span className="lede-sep">·</span>
-            pic d’activité vers <strong>{formatHour(periodAvgHour)}</strong>
+            pic vers <strong>{formatHour(periodAvgHour)}</strong>
           </p>
         </div>
         <ClawdMascot
           static
-          size={120}
+          size={112}
           onClick={() => {
             setSkateKey((k) => k + 1);
             void refresh(period);
@@ -180,27 +285,23 @@ export default function App() {
           ))}
         </div>
 
-        <div className="seg">
-          {(
-            [
-              ["all", "Global", null],
-              ["claude", "Claude", "halo"],
-              ["cursor", "Cursor", "sunglasses"],
-            ] as const
-          ).map(([id, label, sprite]) => (
-            <button
-              key={id}
-              type="button"
-              className={source === id ? "active" : ""}
-              onClick={() => setSource(id)}
-            >
-              {source === id && sprite && (
-                <ClawdSprite id={sprite} size={22} className="inline-sprite" />
-              )}
-              {label}
-            </button>
-          ))}
-        </div>
+        {sourceButtons.length > 1 && (
+          <div className="seg">
+            {sourceButtons.map(([id, label, sprite]) => (
+              <button
+                key={id}
+                type="button"
+                className={activeSource === id ? "active" : ""}
+                onClick={() => setSource(id)}
+              >
+                {activeSource === id && sprite && (
+                  <ClawdSprite id={sprite} size={22} className="inline-sprite" />
+                )}
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <button
           type="button"
@@ -215,13 +316,13 @@ export default function App() {
 
       {error && <p className="banner error">{error}</p>}
 
-      <StatCards {...totals} periodLabel={periodLabel} source={source} />
+      <StatCards {...totals} periodLabel={periodLabel} source={activeSource} />
 
       <PeriodInsights
         hourCounts={periodHours}
         avgHour={periodAvgHour}
         models={periodModels}
-        source={source}
+        source={activeSource}
         periodLabel={periodLabel}
       />
 
@@ -246,8 +347,8 @@ export default function App() {
         </div>
         {data ? (
           <DayChart
-            days={data.days}
-            source={source}
+            days={chartDays}
+            source={activeSource}
             selectedDate={selectedDate}
             onSelect={(date) => {
               setSelectedDate(date);
@@ -262,27 +363,26 @@ export default function App() {
       {selected && (
         <DayDetail
           day={selected}
-          source={source}
+          source={activeSource}
           onClose={() => setSelectedDate(null)}
         />
       )}
 
-      {!selected && data?.days[data.days.length - 1] && (
+      {!selected && today && (
         <section className="today panel today-panel">
           <h2>
             <ClawdSprite id="halo" size={28} className="inline-sprite" />
             Aujourd’hui
           </h2>
           <p className="today-big">
-            {formatTokens(tokensForSource(data.days[data.days.length - 1], source))}
+            {formatTokens(tokensForSource(today, activeSource))}
           </p>
           <p className="today-full">
-            {formatTokensFull(tokensForSource(data.days[data.days.length - 1], source))}{" "}
-            tokens
+            {formatTokensFull(tokensForSource(today, activeSource))} tokens
             <span className="lede-sep">·</span>
-            {data.days[data.days.length - 1].requestCount} requêtes
+            {today.requestCount} requêtes
             <span className="lede-sep">·</span>
-            {costForSource(data.days[data.days.length - 1], source).toFixed(2)} $
+            {costForSource(today, activeSource).toFixed(2)} $
           </p>
         </section>
       )}
@@ -296,12 +396,26 @@ export default function App() {
         >
           <ClawdSprite id="skate" size={28} />
         </button>
-        <span>
-          {data?.cursorAutoPath
-            ? `Cursor · ${data.cursorAutoPath}`
-            : "Cursor · sync auto depuis cursor.com (session Cursor)"}
+        <span className="foot-meta">
+          {[
+            settings.enableClaude ? "Claude · logs locaux" : null,
+            settings.enableCursor
+              ? data?.cursorAutoPath
+                ? `Cursor · ${data.cursorAutoPath}`
+                : "Cursor · sync cursor.com"
+              : null,
+          ]
+            .filter(Boolean)
+            .join("  ·  ")}
         </span>
       </footer>
+
+      <SettingsPanel
+        open={settingsOpen}
+        settings={settings}
+        onChange={setSettings}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   );
 }
