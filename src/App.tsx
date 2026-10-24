@@ -299,7 +299,7 @@ export default function App() {
         <span>
           {data?.cursorAutoPath
             ? `Cursor · ${data.cursorAutoPath}`
-            : "Cursor · sync auto une fois par jour (session Cursor)"}
+            : "Cursor · sync auto depuis cursor.com (session Cursor)"}
         </span>
       </footer>
     </div>

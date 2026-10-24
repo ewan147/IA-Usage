@@ -15,8 +15,8 @@ export function CsvDropzone({ importedAt, autoPath, busy, onManual, onAuto }: Pr
       <div>
         <p className="dropzone-title">Cursor — sync auto</p>
         <p className="dropzone-sub">
-          Une fois par jour, l’app télécharge ton usage depuis cursor.com avec la session
-          Cursor déjà ouverte sur ce PC. Fallback : CSV dans Téléchargements.
+          L’app télécharge ton usage depuis cursor.com avec la session Cursor de ce PC
+          (rafraîchi environ toutes les 2 h). Fallback : CSV dans Téléchargements.
         </p>
         {autoPath && <p className="dropzone-meta">Fichier : {autoPath}</p>}
         {importedAt && (

@@ -20,8 +20,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 
 | Source | Données |
 | --- | --- |
-| **Claude Code** | Logs locaux `~/.claude/projects/**/*.jsonl` |
-| **Cursor** | Sync auto 1×/jour via ta session Cursor (`cursor.com`) |
+| **Claude Code** | Logs locaux `~/.claude/projects/**/*.jsonl` (1 appel API = 1 total, dédup streaming) |
+| **Cursor** | CSV officiel `cursor.com` via ta session Cursor (Total Tokens, jour local) |
 
 Le widget suit Cursor et Claude. Clic = ouvrir le dashboard (qui reste en fond si tu le fermes).
 

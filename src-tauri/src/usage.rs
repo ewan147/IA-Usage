@@ -1,7 +1,7 @@
 use chrono::{DateTime, Duration, Local, NaiveDate, Timelike};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -70,7 +70,22 @@ struct PersistedCursor {
     /// Local calendar day (YYYY-MM-DD) of the last successful cursor.com API sync.
     #[serde(default)]
     last_api_sync_day: Option<String>,
+    /// RFC3339 timestamp of last successful API sync (for freshness).
+    #[serde(default)]
+    last_api_sync_at: Option<String>,
     days: BTreeMap<String, CursorDay>,
+}
+
+/// One Claude API call after streaming-chunk dedup.
+#[derive(Clone)]
+struct ClaudeCall {
+    date: String,
+    hour: u32,
+    model: String,
+    input: u64,
+    output: u64,
+    cache_read: u64,
+    cache_creation: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -256,7 +271,27 @@ fn finalize_day(date: String, acc: DayAcc, cursor: Option<&CursorDay>) -> DayBuc
     day
 }
 
-fn scan_jsonl_file(path: &Path, cutoff: NaiveDate, map: &mut BTreeMap<String, DayAcc>) {
+/// Claude Code writes several JSONL lines per API call while streaming.
+/// Same `message.id` / `requestId`; `output_tokens` grows; input/cache repeat.
+/// Keep the snapshot with the largest `output_tokens` (final totals).
+fn claude_call_key(value: &Value, message: &Value) -> String {
+    let msg_id = message.get("id").and_then(|v| v.as_str()).unwrap_or("");
+    let req_id = value
+        .get("requestId")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if !msg_id.is_empty() || !req_id.is_empty() {
+        return format!("{msg_id}|{req_id}");
+    }
+    // Fallback: unique per line (no dedup possible).
+    value
+        .get("uuid")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+fn scan_jsonl_file(path: &Path, cutoff: NaiveDate, calls: &mut HashMap<String, ClaudeCall>) {
     let file = match fs::File::open(path) {
         Ok(f) => f,
         Err(_) => return,
@@ -307,19 +342,49 @@ fn scan_jsonl_file(path: &Path, cutoff: NaiveDate, map: &mut BTreeMap<String, Da
         let model = message
             .get("model")
             .and_then(|m| m.as_str())
-            .unwrap_or("claude-sonnet");
-        let cost = estimate_cost(model, input, output, cache_read, cache_creation);
-        let key = date.format("%Y-%m-%d").to_string();
-        let acc = map.entry(key).or_default();
-        absorb_event(
-            acc,
+            .unwrap_or("claude-sonnet")
+            .to_string();
+        let key = claude_call_key(&value, message);
+        if key.is_empty() {
+            continue;
+        }
+        let next = ClaudeCall {
+            date: date.format("%Y-%m-%d").to_string(),
+            hour: dt.hour(),
             model,
             input,
             output,
             cache_read,
             cache_creation,
+        };
+        match calls.get(&key) {
+            Some(prev) if next.output < prev.output => {}
+            _ => {
+                calls.insert(key, next);
+            }
+        }
+    }
+}
+
+fn fold_claude_calls(calls: HashMap<String, ClaudeCall>, map: &mut BTreeMap<String, DayAcc>) {
+    for call in calls.into_values() {
+        let cost = estimate_cost(
+            &call.model,
+            call.input,
+            call.output,
+            call.cache_read,
+            call.cache_creation,
+        );
+        let acc = map.entry(call.date).or_default();
+        absorb_event(
+            acc,
+            &call.model,
+            call.input,
+            call.output,
+            call.cache_read,
+            call.cache_creation,
             cost,
-            dt.hour() as u32,
+            call.hour,
         );
     }
 }
@@ -365,6 +430,10 @@ fn parse_u64(raw: &str) -> u64 {
 
 fn extract_date(raw: &str) -> Option<String> {
     let s = raw.trim().trim_matches('"');
+    // Prefer full timestamp → local calendar day (CSV dates are UTC).
+    if let Some(dt) = parse_local_datetime(s) {
+        return Some(dt.date_naive().format("%Y-%m-%d").to_string());
+    }
     if s.len() >= 10 {
         let candidate = &s[..10];
         if NaiveDate::parse_from_str(candidate, "%Y-%m-%d").is_ok() {
@@ -473,9 +542,19 @@ pub fn import_cursor_csv_content(
     let cache_read_idx = find_col(&headers, &["cacheread", "cache_read"]);
     let output_idx = find_col(&headers, &["outputtokens", "output_tokens", "output"]);
     let model_idx = find_col(&headers, &["model", "modelname"]);
+    // Prefer what you actually pay when both columns exist.
     let cost_idx = find_col(
         &headers,
-        &["cost", "charged", "amount", "totalcost", "costusd", "price"],
+        &[
+            "costtoyou",
+            "cost_to_you",
+            "cost",
+            "charged",
+            "amount",
+            "totalcost",
+            "costusd",
+            "price",
+        ],
     );
 
     let mut days: BTreeMap<String, CursorDay> = BTreeMap::new();
@@ -571,6 +650,11 @@ pub fn import_cursor_csv_content(
             Some(today)
         } else {
             previous.last_api_sync_day
+        },
+        last_api_sync_at: if from_api {
+            Some(imported_at.clone())
+        } else {
+            previous.last_api_sync_at
         },
         days,
     };
@@ -679,19 +763,30 @@ pub fn find_and_import_cursor_csv(app: &AppHandle) -> Result<Option<CursorImport
     Ok(Some(result))
 }
 
-/// Sync Cursor usage from cursor.com at most once per local day.
+fn cursor_sync_is_fresh(existing: &PersistedCursor) -> bool {
+    if existing.days.is_empty() {
+        return false;
+    }
+    let Some(raw) = existing.last_api_sync_at.as_deref() else {
+        // Legacy: only day marker — treat as stale so we refresh once.
+        return false;
+    };
+    let Some(dt) = parse_local_datetime(raw) else {
+        return false;
+    };
+    let age = Local::now() - dt;
+    age < Duration::hours(2)
+}
+
+/// Sync Cursor usage from cursor.com (at most every ~2h unless forced).
 /// Falls back to a Downloads CSV if the API is unavailable.
 pub fn ensure_cursor_usage(
     app: &AppHandle,
     force: bool,
 ) -> Result<Option<CursorImportResult>, String> {
-    let today = crate::cursor_sync::today_local();
     let existing = load_cursor(app);
 
-    if !force
-        && existing.last_api_sync_day.as_deref() == Some(today.as_str())
-        && !existing.days.is_empty()
-    {
+    if !force && cursor_sync_is_fresh(&existing) {
         return Ok(None);
     }
 
@@ -700,7 +795,7 @@ pub fn ensure_cursor_usage(
             let result = import_cursor_csv_content(
                 &csv,
                 app,
-                Some("cursor.com (auto 1×/jour)".into()),
+                Some("cursor.com (sync auto)".into()),
                 true,
             )?;
             Ok(Some(result))
@@ -720,12 +815,14 @@ pub fn ensure_cursor_usage(
 }
 
 pub fn load_merged_usage(days: u32, app: &AppHandle) -> Result<MergedUsageResponse, String> {
-    // Cursor: pull usage CSV from cursor.com once per day (local session token).
+    // Cursor: pull billed usage CSV from cursor.com (session token).
     let _ = ensure_cursor_usage(app, false);
 
     let mut map = empty_series(days);
     let cutoff = cutoff_date(days);
 
+    // Claude: dedupe streaming JSONL chunks across all session files first.
+    let mut claude_calls: HashMap<String, ClaudeCall> = HashMap::new();
     for root in claude_dirs() {
         if !root.exists() {
             continue;
@@ -735,9 +832,10 @@ pub fn load_merged_usage(days: u32, app: &AppHandle) -> Result<MergedUsageRespon
             if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
                 continue;
             }
-            scan_jsonl_file(path, cutoff, &mut map);
+            scan_jsonl_file(path, cutoff, &mut claude_calls);
         }
     }
+    fold_claude_calls(claude_calls, &mut map);
 
     let cursor = load_cursor(app);
     let mut days_out = Vec::new();
