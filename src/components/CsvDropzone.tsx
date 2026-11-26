@@ -1,48 +1,53 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { sprites } from "../assets/clawd/sprites";
 
 type Props = {
   importedAt: string | null;
-  autoPath: string | null;
+  syncError: string | null;
+  manual: boolean;
   busy?: boolean;
-  onManual: (content: string) => Promise<void>;
+  message: string | null;
+  onManual: (file: File) => Promise<void>;
   onAuto: () => Promise<void>;
+  onError: (error: unknown) => void;
 };
 
-export function CsvDropzone({ importedAt, autoPath, busy, onManual, onAuto }: Props) {
+export function CsvDropzone({ importedAt, syncError, manual, busy, message, onManual, onAuto, onError }: Props) {
   return (
     <div className="dropzone">
       <img src={sprites.cursorLogo} alt="" className="dropzone-logo" />
       <div>
-        <p className="dropzone-title">Cursor — sync auto</p>
+        <p className="dropzone-title">Données Cursor</p>
         <p className="dropzone-sub">
-          L’app télécharge ton usage depuis cursor.com avec la session Cursor de ce PC
-          (rafraîchi environ toutes les 2 h). Fallback : CSV dans Téléchargements.
+          Exporte l’historique souhaité depuis le tableau de bord Cursor. Un import remplace l’historique Cursor affiché.
         </p>
-        {autoPath && <p className="dropzone-meta">Fichier : {autoPath}</p>}
         {importedAt && (
           <p className="dropzone-meta">
             Dernier import : {new Date(importedAt).toLocaleString("fr-FR")}
           </p>
         )}
+        {syncError && <p className="dropzone-error">Synchronisation indisponible. {syncError}</p>}
+        {manual && <p className="dropzone-meta">Mode CSV manuel. La synchronisation automatique est en pause.</p>}
+        {message && <p className="dropzone-meta" role="status">{message}</p>}
       </div>
       <div className="dropzone-actions">
-        <button type="button" className="file-btn" disabled={busy} onClick={() => void onAuto()}>
-          {busy ? "Import…" : "Chercher le CSV"}
+        <button type="button" className="ghost file-alt" onClick={() => void openUrl("https://cursor.com/dashboard/usage").catch(onError)}>
+          Ouvrir le tableau de bord Cursor
         </button>
-        <label className="ghost file-alt">
-          Manuel
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            hidden
-            disabled={busy}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void file.text().then(onManual);
-              e.target.value = "";
-            }}
-          />
-        </label>
+        <input
+          aria-label="Importer un CSV Cursor"
+          type="file"
+          accept=".csv,text/csv"
+          disabled={busy}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void onManual(file);
+          }}
+        />
+        <button type="button" className="ghost file-alt" disabled={busy} onClick={() => void onAuto()}>
+          Synchroniser avec Cursor
+        </button>
       </div>
     </div>
   );

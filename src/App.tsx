@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ClawdMascot } from "./components/ClawdMascot";
 import { ClawdSprite } from "./components/ClawdSprite";
+import { CsvDropzone } from "./components/CsvDropzone";
 import { SkateIntro } from "./components/SkateIntro";
 import { DayChart } from "./components/DayChart";
 import { DayDetail } from "./components/DayDetail";
 import { PeriodInsights } from "./components/PeriodInsights";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatCards } from "./components/StatCards";
-import { fetchMergedUsage, hideDashboard } from "./lib/api";
+import { autoImportCursorCsv, fetchMergedUsage, hideDashboard, importCursorCsv } from "./lib/api";
 import {
   applyFontPreset,
   CHART_METRIC_OPTIONS,
@@ -52,6 +53,8 @@ export default function App() {
   const [data, setData] = useState<MergedUsageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cursorBusy, setCursorBusy] = useState(false);
+  const [cursorMessage, setCursorMessage] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [skateKey, setSkateKey] = useState(0);
   const [blastTick, setBlastTick] = useState(0);
@@ -94,6 +97,27 @@ export default function App() {
       setLoading(false);
     }
   }, []);
+
+  const showCursorError = (error: unknown) => {
+    setCursorMessage(error instanceof Error ? error.message : String(error));
+  };
+
+  const updateCursor = async (file?: File) => {
+    setCursorBusy(true);
+    setCursorMessage(null);
+    try {
+      const result = file ? await importCursorCsv(await file.text()) : await autoImportCursorCsv();
+      await refresh(period);
+      if (result) {
+        const action = file ? "CSV importé" : "Cursor synchronisé";
+        setCursorMessage(`${action} · ${result.rowCount} événements.`);
+      }
+    } catch (error) {
+      showCursorError(error);
+    } finally {
+      setCursorBusy(false);
+    }
+  };
 
   useEffect(() => {
     void refresh(period);
@@ -315,6 +339,7 @@ export default function App() {
               key={p}
               type="button"
               className={period === p ? "active" : ""}
+              disabled={cursorBusy}
               onClick={() => setPeriod(p)}
             >
               {p === 0 ? "Total" : `${p} j`}
@@ -343,7 +368,7 @@ export default function App() {
         <button
           type="button"
           className="ghost refresh-btn"
-          disabled={loading}
+          disabled={loading || cursorBusy}
           onClick={() => void refresh(period)}
         >
           <ClawdSprite id="invader" size={26} title="Rafraîchir" />
@@ -442,6 +467,19 @@ export default function App() {
         </section>
       )}
 
+      {settings.enableCursor && (
+        <CsvDropzone
+          importedAt={data?.cursorImportedAt ?? null}
+          syncError={data?.cursorSyncError ?? null}
+          manual={data?.cursorManualImport ?? false}
+          busy={loading || cursorBusy}
+          message={cursorMessage}
+          onManual={updateCursor}
+          onAuto={updateCursor}
+          onError={showCursorError}
+        />
+      )}
+
       <footer className="foot">
         <button
           type="button"
@@ -457,7 +495,7 @@ export default function App() {
             settings.enableCursor
               ? data?.cursorAutoPath
                 ? `Cursor · ${data.cursorAutoPath}`
-                : "Cursor · sync cursor.com"
+                : "Cursor · historique du compte"
               : null,
           ]
             .filter(Boolean)

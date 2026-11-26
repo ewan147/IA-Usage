@@ -33,6 +33,8 @@ export type MergedUsageResponse = {
   cursorImportedAt: string | null;
   cursorDayCount: number;
   cursorAutoPath: string | null;
+  cursorSyncError: string | null;
+  cursorManualImport: boolean;
 };
 
 export type CursorImportResult = {

@@ -51,6 +51,8 @@ pub struct MergedUsageResponse {
     pub cursor_imported_at: Option<String>,
     pub cursor_day_count: u64,
     pub cursor_auto_path: Option<String>,
+    pub cursor_sync_error: Option<String>,
+    pub cursor_manual_import: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +75,8 @@ struct PersistedCursor {
     /// RFC3339 timestamp of last successful API sync (for freshness).
     #[serde(default)]
     last_api_sync_at: Option<String>,
+    #[serde(default)]
+    manual_import: bool,
     days: BTreeMap<String, CursorDay>,
 }
 
@@ -428,12 +432,12 @@ fn parse_f64(raw: &str) -> f64 {
     {
         return 0.0;
     }
-    cleaned.parse().unwrap_or(0.0)
+    cleaned.parse::<f64>().ok().filter(|cost| cost.is_finite()).unwrap_or(0.0)
 }
 
-fn parse_u64(raw: &str) -> u64 {
+fn parse_u64(raw: &str) -> Option<u64> {
     let cleaned = raw.trim().trim_matches('"').replace(',', "");
-    cleaned.parse().unwrap_or(0)
+    cleaned.parse().ok()
 }
 
 fn extract_date(raw: &str) -> Option<String> {
@@ -442,8 +446,7 @@ fn extract_date(raw: &str) -> Option<String> {
     if let Some(dt) = parse_local_datetime(s) {
         return Some(dt.date_naive().format("%Y-%m-%d").to_string());
     }
-    if s.len() >= 10 {
-        let candidate = &s[..10];
+    if let Some(candidate) = s.get(..10) {
         if NaiveDate::parse_from_str(candidate, "%Y-%m-%d").is_ok() {
             return Some(candidate.to_string());
         }
@@ -505,12 +508,7 @@ fn parse_csv_line(line: &str) -> Vec<String> {
     out
 }
 
-pub fn import_cursor_csv_content(
-    content: &str,
-    app: &AppHandle,
-    source_path: Option<String>,
-    from_api: bool,
-) -> Result<CursorImportResult, String> {
+fn parse_cursor_csv(content: &str) -> Result<(BTreeMap<String, CursorDay>, u64), String> {
     let mut lines = content.lines().filter(|l| !l.trim().is_empty());
     let header_line = lines.next().ok_or("CSV vide")?;
     let headers = parse_csv_line(header_line);
@@ -549,6 +547,12 @@ pub fn import_cursor_csv_content(
     );
     let cache_read_idx = find_col(&headers, &["cacheread", "cache_read"]);
     let output_idx = find_col(&headers, &["outputtokens", "output_tokens", "output"]);
+    if [tokens_idx, input_wo_cache_idx, input_w_cache_idx, cache_read_idx, output_idx]
+        .iter()
+        .all(Option::is_none)
+    {
+        return Err("Aucune colonne de tokens dans le CSV Cursor".into());
+    }
     let model_idx = find_col(&headers, &["model", "modelname"]);
     // Prefer what you actually pay when both columns exist.
     let cost_idx = find_col(
@@ -578,31 +582,22 @@ pub fn import_cursor_csv_content(
             continue;
         };
 
-        let input_wo = input_wo_cache_idx
-            .and_then(|i| cols.get(i))
-            .map(|v| parse_u64(v))
-            .unwrap_or(0);
-        let input_w = input_w_cache_idx
-            .and_then(|i| cols.get(i))
-            .map(|v| parse_u64(v))
-            .unwrap_or(0);
-        let cache_read = cache_read_idx
-            .and_then(|i| cols.get(i))
-            .map(|v| parse_u64(v))
-            .unwrap_or(0);
-        let output = output_idx
-            .and_then(|i| cols.get(i))
-            .map(|v| parse_u64(v))
-            .unwrap_or(0);
-        let tokens_no_cache = input_wo + input_w + output;
-        // ALWAYS prefer CSV "Total Tokens" — this is what Cursor reports.
-        let mut tokens = tokens_idx
-            .and_then(|i| cols.get(i))
-            .map(|v| parse_u64(v))
-            .unwrap_or(0);
-        if tokens == 0 {
-            tokens = tokens_no_cache + cache_read;
+        let read_tokens = |index: Option<usize>| {
+            index.and_then(|i| cols.get(i)).and_then(|v| parse_u64(v))
+        };
+        let total = read_tokens(tokens_idx);
+        let input_wo = read_tokens(input_wo_cache_idx);
+        let input_w = read_tokens(input_w_cache_idx);
+        let cache_read = read_tokens(cache_read_idx);
+        let output = read_tokens(output_idx);
+        if [total, input_wo, input_w, cache_read, output].iter().all(Option::is_none) {
+            continue;
         }
+        let tokens_no_cache = input_wo.unwrap_or(0)
+            .saturating_add(input_w.unwrap_or(0))
+            .saturating_add(output.unwrap_or(0));
+        // Prefer CSV "Total Tokens", including a reported total of zero.
+        let tokens = total.unwrap_or_else(|| tokens_no_cache.saturating_add(cache_read.unwrap_or(0)));
 
         let cost = cost_idx
             .and_then(|i| cols.get(i))
@@ -623,9 +618,12 @@ pub fn import_cursor_csv_content(
         if entry.hour_counts.len() != 24 {
             entry.hour_counts = vec![0; 24];
         }
-        entry.tokens += tokens;
-        entry.tokens_no_cache += tokens_no_cache;
+        entry.tokens = entry.tokens.saturating_add(tokens);
+        entry.tokens_no_cache = entry.tokens_no_cache.saturating_add(tokens_no_cache);
         entry.cost_usd += cost;
+        if !entry.cost_usd.is_finite() {
+            return Err("Le total des coûts du CSV dépasse la plage autorisée".into());
+        }
         entry.request_count += 1;
         entry.hour_counts[hour % 24] += 1;
         let m = entry.models.entry(model.clone()).or_insert_with(|| ModelStat {
@@ -635,19 +633,32 @@ pub fn import_cursor_csv_content(
             cost_usd: 0.0,
             source: "cursor".into(),
         });
-        m.tokens += tokens;
+        m.tokens = m.tokens.saturating_add(tokens);
         m.requests += 1;
         m.cost_usd += cost;
+        if !m.cost_usd.is_finite() {
+            return Err("Le coût d’un modèle dans le CSV dépasse la plage autorisée".into());
+        }
         row_count += 1;
     }
 
     if row_count == 0 {
         return Err("Aucune ligne utilisable trouvée dans le CSV".into());
     }
+    Ok((days, row_count))
+}
+
+pub fn import_cursor_csv_content(
+    content: &str,
+    app: &AppHandle,
+    source_path: Option<String>,
+    from_api: bool,
+) -> Result<CursorImportResult, String> {
+    let (days, row_count) = parse_cursor_csv(content)?;
 
     let imported_at = Local::now().to_rfc3339();
     let day_count = days.len() as u64;
-    let total_tokens = days.values().map(|d| d.tokens).sum();
+    let total_tokens = days.values().map(|d| d.tokens).fold(0, u64::saturating_add);
     let today = crate::cursor_sync::today_local();
     let previous = load_cursor(app);
 
@@ -664,11 +675,14 @@ pub fn import_cursor_csv_content(
         } else {
             previous.last_api_sync_at
         },
+        manual_import: !from_api && source_path.is_none(),
         days,
     };
     let path = cursor_store_path(app)?;
     let json = serde_json::to_string_pretty(&persisted).map_err(|e| e.to_string())?;
-    fs::write(path, json).map_err(|e| e.to_string())?;
+    let temp = path.with_extension("json.tmp");
+    fs::write(&temp, json).map_err(|e| e.to_string())?;
+    fs::rename(&temp, &path).map_err(|e| e.to_string())?;
 
     if let Ok(dir) = app.path().app_data_dir() {
         let _ = fs::write(dir.join("cursor-last-import.csv"), content);
@@ -794,7 +808,7 @@ pub fn ensure_cursor_usage(
 ) -> Result<Option<CursorImportResult>, String> {
     let existing = load_cursor(app);
 
-    if !force && cursor_sync_is_fresh(&existing) {
+    if !force && (existing.manual_import || cursor_sync_is_fresh(&existing)) {
         return Ok(None);
     }
 
@@ -809,14 +823,14 @@ pub fn ensure_cursor_usage(
             Ok(Some(result))
         }
         Err(api_err) => {
-            // Soft fallback: Downloads CSV if we have nothing (or forced).
-            if force || existing.days.is_empty() {
+            // Bootstrap from Downloads only when no history has been imported.
+            if !force && existing.days.is_empty() {
                 match find_and_import_cursor_csv(app)? {
                     Some(r) => Ok(Some(r)),
                     None => Err(api_err),
                 }
             } else {
-                Ok(None)
+                Err(api_err)
             }
         }
     }
@@ -824,7 +838,7 @@ pub fn ensure_cursor_usage(
 
 pub fn load_merged_usage(days: u32, app: &AppHandle) -> Result<MergedUsageResponse, String> {
     // Cursor: pull billed usage CSV from cursor.com (session token).
-    let _ = ensure_cursor_usage(app, false);
+    let cursor_sync_error = ensure_cursor_usage(app, false).err();
 
     let mut map = empty_series(days);
     let cutoff = cutoff_date(days);
@@ -890,5 +904,53 @@ pub fn load_merged_usage(days: u32, app: &AppHandle) -> Result<MergedUsageRespon
         },
         cursor_day_count,
         cursor_auto_path: cursor.source_path.clone(),
+        cursor_sync_error,
+        cursor_manual_import: cursor.manual_import,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cursor_csv_import_uses_total_tokens_and_accepts_reordered_columns() {
+        let csv = "\u{feff}Date,Product,Model,Output Tokens,Total Tokens,Cost\r\n2026-11-25,Cursor,composer-2.5,3,12,0.01\r\n";
+        let (days, rows) = parse_cursor_csv(csv).expect("valid Cursor export");
+        let day = &days["2026-11-25"];
+        assert_eq!(rows, 1);
+        assert_eq!(day.tokens, 12);
+        assert_eq!(day.request_count, 1);
+        assert_eq!(day.models["composer-2.5"].cost_usd, 0.01);
+    }
+
+    #[test]
+    fn cursor_csv_rejects_exports_without_token_columns() {
+        let csv = "Date,Product,Cost\n2026-11-25,Cursor,0.01";
+        assert!(parse_cursor_csv(csv).is_err());
+    }
+
+    #[test]
+    fn cursor_csv_rejects_exports_without_valid_events() {
+        assert!(parse_cursor_csv("Date,Total Tokens\ninvalid,12").is_err());
+        assert!(parse_cursor_csv("Date,Total Tokens\n年月後日,12").is_err());
+        assert!(parse_cursor_csv("Date,Total Tokens\n2026-11-25,garbage").is_err());
+    }
+
+    #[test]
+    fn cursor_csv_honors_reported_zero_total() {
+        let csv = "Date,Total Tokens,Output Tokens\n2026-11-25,0,3";
+        let (days, rows) = parse_cursor_csv(csv).expect("valid zero-token event");
+        assert_eq!(rows, 1);
+        assert_eq!(days["2026-11-25"].tokens, 0);
+    }
+
+    #[test]
+    fn cursor_csv_never_persists_a_non_finite_cost() {
+        let csv = "Date,Total Tokens,Cost\n2026-11-25,12,NaN";
+        let (days, _) = parse_cursor_csv(csv).expect("valid tokens with an unavailable cost");
+        assert_eq!(days["2026-11-25"].cost_usd, 0.0);
+        let serialized = serde_json::to_string(&days).unwrap();
+        assert!(serde_json::from_str::<BTreeMap<String, CursorDay>>(&serialized).is_ok());
+    }
 }
