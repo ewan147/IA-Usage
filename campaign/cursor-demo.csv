@@ -1,0 +1,4 @@
+Date,Model,Input (w/o Cache Write),Input (w/ Cache Write),Cache Read,Output Tokens,Total Tokens,Cost
+2026-11-23T13:00:00Z,composer-2.5,1200,0,600,250,2050,0.02
+2026-11-24T16:20:00Z,grok-4.7,2400,300,800,550,4050,0.05
+2026-11-25T11:45:00Z,composer-2.5,1800,200,500,300,2800,0.03

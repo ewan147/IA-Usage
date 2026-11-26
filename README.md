@@ -8,7 +8,7 @@
 
 ## Install on Windows
 
-Download the preview installer from [GitHub Releases](https://github.com/ewan147/IA-Usage/releases) for Windows builds. To build from source, install [Node.js 24 LTS](https://nodejs.org/) and the [Windows prerequisites for Tauri](https://v2.tauri.app/start/prerequisites/#windows), then run:
+**[Download the Windows x64 installer](https://github.com/ewan147/IA-Usage/releases/download/0.1.0-preview.1/IA.Usage_0.1.0_x64-setup.exe)** · [MSI and release notes](https://github.com/ewan147/IA-Usage/releases/tag/0.1.0-preview.1). To build from source, install [Node.js 24 LTS](https://nodejs.org/) and the [Windows prerequisites for Tauri](https://v2.tauri.app/start/prerequisites/#windows), then run:
 
 ```powershell
 git clone https://github.com/ewan147/IA-Usage.git
@@ -28,10 +28,12 @@ The Windows app enables startup for the current user when launched in a release 
 
 The dashboard reads local Claude Code logs. Cursor sync connects to cursor.com and keeps the latest imported export and totals on your PC. If automatic sync fails, open **Données Cursor** in IA Usage, export the desired date range from the Cursor dashboard, then select the CSV. Each manual import replaces the displayed Cursor history and pauses automatic sync. A successful **Synchroniser avec Cursor** starts it again. Cursor's newer plans can share a weekly allowance with Grok. IA Usage displays event totals for all rows in the export. If the export includes Grok Bot, filter to Cursor in the dashboard before exporting. The app does not show your remaining allowance. [Cursor usage limits](https://cursor.com/help/models-and-usage/usage-limits)
 
-Found a mismatch? [Open an issue](https://github.com/ewan147/IA-Usage/issues/new) with your Windows version, Cursor plan type and CSV column names. Keep account details, session data and private logs out of public reports. If the widget saves you a trip to the usage dashboard, a star helps other Windows users find it.
+Trying IA Usage on a clean install? Use the [sample Cursor export](campaign/cursor-demo.csv) and choose **Total** to see all three events. Importing the sample replaces any Cursor history already in IA Usage. Share what worked or what failed in the [Windows preview feedback form](https://github.com/ewan147/IA-Usage/issues/new?template=windows-preview.yml). Keep account details, session data and private logs out of public reports. If the widget saves you a trip to the usage dashboard, a star helps other Windows users find it.
 
 ## En français
 
 IA Usage rassemble l’historique des tokens Claude Code et Cursor dans un tableau de bord Windows. Clique sur la mascotte près de la fenêtre active pour l’afficher. Les coûts Claude Code sont estimés d’après des tarifs API. Pour Cursor, l’application affiche les événements disponibles dans l’export du compte. Le quota hebdomadaire restant est consultable dans Cursor.
+
+[Télécharger la préversion Windows x64](https://github.com/ewan147/IA-Usage/releases/tag/0.1.0-preview.1) · [Donner un retour](https://github.com/ewan147/IA-Usage/issues/new?template=windows-preview.yml)
 
 Build de développement : `npm ci`, puis `npm run tauri dev`.

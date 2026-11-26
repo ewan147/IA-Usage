@@ -1,0 +1,53 @@
+name: Windows preview feedback
+description: Report what happened when you tried IA Usage on Windows.
+title: '[Preview] '
+body:
+  - type: markdown
+    attributes:
+      value: Share column names or short error messages. Keep account details, session tokens, CSV rows, and private logs out of the report.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Test area
+      options:
+        - Windows installation
+        - Cursor CSV
+        - Claude Code or dashboard
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: dropdown
+    id: cursor-plan
+    attributes:
+      label: Cursor plan
+      options:
+        - Individual legacy
+        - The X Subscription
+        - Team or Enterprise
+        - Unknown or not applicable
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Test result
+      options:
+        - Worked
+        - Installation failed
+        - Cursor totals differ
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: Say what you tried and what happened. For a CSV discrepancy, include the compared date range and column names.
+    validations:
+      required: true

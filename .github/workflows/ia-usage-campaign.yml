@@ -1,0 +1,52 @@
+name: IA Usage weekly campaign
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8,17 26-30 11 *'
+    - cron: '17 8,17 1-5 12 *'
+    - cron: '7 23 2 12 *'  # 3 December at 00:07 in Paris
+
+permissions: {}
+
+concurrency:
+  group: ia-usage-weekly-campaign
+  cancel-in-progress: false
+
+jobs:
+  campaign:
+    if: github.repository == 'ewan147/IA-Usage' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      finished: ${{ steps.campaign.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test campaign logic
+        run: node --test campaign/run.test.mjs
+      - name: Apply the campaign
+        id: campaign
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node campaign/run.mjs
+
+  stop:
+    if: needs.campaign.outputs.finished == 'true'
+    needs: campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
+    steps:
+      - name: Disable the completed campaign
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable ia-usage-campaign.yml --repo ewan147/IA-Usage

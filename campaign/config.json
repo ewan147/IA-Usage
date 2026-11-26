@@ -1,0 +1,15 @@
+{
+  "repository": "ewan147/IA-Usage",
+  "startedAt": "2026-11-26T00:00:00+01:00",
+  "endsAt": "2026-12-03T00:00:00+01:00",
+  "thread": 1,
+  "tag": "0.1.0-preview.1",
+  "assets": {
+    "IA.Usage_0.1.0_x64-setup.exe": "sha256:52207d5520fe219c5eabbf4035229504a3dfa350b6c614754640667f5e7a8e8c",
+    "IA.Usage_0.1.0_x64_en-US.msi": "sha256:29a636d043755939ede1311edf3cd8d3a2906270626a53906eb6a705ea0cbbf8"
+  },
+  "directories": [
+    { "repository": "hao-ji-xing/awesome-cursor", "proposal": 134, "label": "Awesome Cursor" },
+    { "repository": "chrysler-stone/awesome-tauri-apps", "proposal": 80, "label": "Awesome Tauri Apps" }
+  ]
+}
