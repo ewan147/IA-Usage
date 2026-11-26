@@ -88,6 +88,8 @@ describe('weekly campaign', () => {
     assert.equal(api.comments.length, 2);
     assert.equal(api.calls.filter(x=>x.path.endsWith('/issues/2/labels')).length, 1);
     assert.match(api.comments[1].body, /GitHub Insights/);
+    assert.match(api.comments[1].body, /Résumé audio.*version locale/);
+    assert.match(api.comments[1].body, /hors de la préversion publique/);
     assert.equal(api.issueReplies.length, 1);
     assert.match(api.issueReplies[0].body, /same date range/);
   });

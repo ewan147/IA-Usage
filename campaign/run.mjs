@@ -80,6 +80,10 @@ function render(config, state, sample, assets, feedback) {
   return [
     state.finished ? '## Bilan de la campagne sur sept jours' : '## Suivi du lancement sur sept jours',
     '',
+    '**Résumé audio · version locale.** Le bouton Windows résume une réponse de Claude ou de Cursor et la lit en français. '
+      + 'Le bouton est hors de la préversion publique. [Écouter la démonstration]('
+      + repoUrl + '#audio-summary-demo)',
+    '',
     'Étoiles **' + sample.stars + '** (' + formatDelta(sample.stars, baseline.stars)
       + '). Téléchargements de la préversion **' + count(sample.downloads) + '** ('
       + formatDelta(sample.downloads, baseline.downloads) + ').',

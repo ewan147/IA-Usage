@@ -6,6 +6,12 @@
 
 *Dashboard shown with sample data.*
 
+## Audio summary demo
+
+In the local Windows build, the **Résumé audio** button turns a completed Claude or Cursor reply into a short spoken summary in French. Summarization and speech synthesis run on the PC. [Listen to a demo made from a fictional reply](docs/audio-summary-demo.wav?raw=1).
+
+The current downloadable Windows preview only includes the usage dashboard and CSV import. The audio button and its local models are separate from that installer.
+
 ## Install on Windows
 
 **[Download the Windows x64 installer](https://github.com/ewan147/IA-Usage/releases/download/0.1.0-preview.1/IA.Usage_0.1.0_x64-setup.exe)** · [MSI and release notes](https://github.com/ewan147/IA-Usage/releases/tag/0.1.0-preview.1). To build from source, install [Node.js 24 LTS](https://nodejs.org/) and the [Windows prerequisites for Tauri](https://v2.tauri.app/start/prerequisites/#windows), then run:
@@ -33,6 +39,8 @@ Trying IA Usage on a clean install? Use the [sample Cursor export](campaign/curs
 ## En français
 
 IA Usage rassemble l’historique des tokens Claude Code et Cursor dans un tableau de bord Windows. Clique sur la mascotte près de la fenêtre active pour l’afficher. Les coûts Claude Code sont estimés d’après des tarifs API. Pour Cursor, l’application affiche les événements disponibles dans l’export du compte. Le quota hebdomadaire restant est consultable dans Cursor.
+
+Dans la version locale de Windows, le bouton **Résumé audio** résume une réponse terminée de Claude ou de Cursor et la lit en français. La préversion publique propose le tableau de bord et l’import CSV. [Écouter la démo sur une réponse fictive](docs/audio-summary-demo.wav?raw=1).
 
 [Télécharger la préversion Windows x64](https://github.com/ewan147/IA-Usage/releases/tag/0.1.0-preview.1) · [Donner un retour](https://github.com/ewan147/IA-Usage/issues/new?template=windows-preview.yml)
 
