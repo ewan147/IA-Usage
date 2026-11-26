@@ -34,7 +34,7 @@ function fixture() {
     failWrites() { failure = new Error('write failed'); },
     async request(path, {method = 'GET', body} = {}) {
       const url = new URL(path, 'https://api.github.com');
-      calls.push({ path: url.pathname, method, body });
+      calls.push({ path: url.pathname, query: url.searchParams, method, body });
       if(method !== 'GET' && failure) throw failure;
       if(url.pathname === '/repos/owner/repo') return { stargazers_count: stars };
       if(url.pathname === '/repos/owner/repo/releases/tags/preview') {
@@ -83,6 +83,8 @@ describe('weekly campaign', () => {
     assert.equal(result.finished, false);
     assert.equal(result.state.baseline.downloads, 1);
     assert.equal(result.state.samples[0].issues, 1);
+    assert.equal(api.calls.find(x => x.path === '/repos/owner/repo/issues').query.get('since'),
+      '2026-11-25T23:00:00.000Z');
     assert.equal(api.comments.length, 2);
     assert.equal(api.calls.filter(x=>x.path.endsWith('/issues/2/labels')).length, 1);
     assert.match(api.comments[1].body, /GitHub Insights/);

@@ -121,7 +121,7 @@ export async function runCampaign(request, config, now = new Date()) {
   const [metadata, release, issues, traffic, proposal] = await Promise.all([
     request(repo),
     request(repo + '/releases/tags/' + encodeURIComponent(config.tag), { optional: true }),
-    list(request, repo + '/issues?state=all&since=' + encodeURIComponent(config.startedAt)),
+    list(request, repo + '/issues?state=all&since=' + encodeURIComponent(new Date(start).toISOString())),
     request(repo + '/traffic/views', { optional: true }),
     Promise.all(config.directories.map(directory => request('/repos/' + directory.repository
       + '/pulls/' + directory.proposal, { optional: true, publicRead: true }))),
