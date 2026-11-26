@@ -547,10 +547,8 @@ fn parse_cursor_csv(content: &str) -> Result<(BTreeMap<String, CursorDay>, u64),
     );
     let cache_read_idx = find_col(&headers, &["cacheread", "cache_read"]);
     let output_idx = find_col(&headers, &["outputtokens", "output_tokens", "output"]);
-    if [tokens_idx, input_wo_cache_idx, input_w_cache_idx, cache_read_idx, output_idx]
-        .iter()
-        .all(Option::is_none)
-    {
+    let token_columns = [tokens_idx, input_wo_cache_idx, input_w_cache_idx, cache_read_idx, output_idx];
+    if token_columns.iter().all(Option::is_none) {
         return Err("Aucune colonne de tokens dans le CSV Cursor".into());
     }
     let model_idx = find_col(&headers, &["model", "modelname"]);
@@ -590,8 +588,16 @@ fn parse_cursor_csv(content: &str) -> Result<(BTreeMap<String, CursorDay>, u64),
         let input_w = read_tokens(input_w_cache_idx);
         let cache_read = read_tokens(cache_read_idx);
         let output = read_tokens(output_idx);
+        let cost_text = cost_idx.and_then(|i| cols.get(i)).map(String::as_str);
         if [total, input_wo, input_w, cache_read, output].iter().all(Option::is_none) {
-            continue;
+            // Cursor reports some free events with blank token fields.
+            let is_free = cost_text.is_some_and(|cost| cost.eq_ignore_ascii_case("free"));
+            let blanks = token_columns.iter().flatten().all(|&i| {
+                cols.get(i).is_some_and(|value| value.is_empty())
+            });
+            if !is_free || !blanks {
+                continue;
+            }
         }
         let tokens_no_cache = input_wo.unwrap_or(0)
             .saturating_add(input_w.unwrap_or(0))
@@ -599,10 +605,7 @@ fn parse_cursor_csv(content: &str) -> Result<(BTreeMap<String, CursorDay>, u64),
         // Prefer CSV "Total Tokens", including a reported total of zero.
         let tokens = total.unwrap_or_else(|| tokens_no_cache.saturating_add(cache_read.unwrap_or(0)));
 
-        let cost = cost_idx
-            .and_then(|i| cols.get(i))
-            .map(|v| parse_f64(v))
-            .unwrap_or(0.0);
+        let cost = cost_text.map(parse_f64).unwrap_or(0.0);
 
         let model = model_idx
             .and_then(|i| cols.get(i))
@@ -943,6 +946,15 @@ mod tests {
         let (days, rows) = parse_cursor_csv(csv).expect("valid zero-token event");
         assert_eq!(rows, 1);
         assert_eq!(days["2026-11-25"].tokens, 0);
+    }
+
+    #[test]
+    fn cursor_csv_counts_free_events_without_tokens() {
+        let csv = "Date,Total Tokens,Cost\n2026-11-25,,Free\n2026-11-25,garbage,Free";
+        let (days, rows) = parse_cursor_csv(csv).expect("a free event with blank token fields");
+        assert_eq!(rows, 1);
+        assert_eq!(days["2026-11-25"].tokens, 0);
+        assert_eq!(days["2026-11-25"].request_count, 1);
     }
 
     #[test]
